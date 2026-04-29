@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Asignatura {
+  id         String   @id @default(uuid())
+  nombre     String
+  color      String
+  created_at DateTime @default(now())
+  tareas     Tarea[]
+  examenes   Examen[]
+
+  @@map("asignaturas")
+}
+
+model Tarea {
+  id             String     @id @default(uuid())
+  asignatura_id  String
+  titulo         String
+  fecha          String
+  hecha          Boolean    @default(false)
+  created_at     DateTime   @default(now())
+  asignatura     Asignatura @relation(fields: [asignatura_id], references: [id], onDelete: Cascade)
+
+  @@map("tareas")
+}
+
+model Examen {
+  id             String     @id @default(uuid())
+  asignatura_id  String
+  titulo         String
+  fecha          String
+  nota           Float?
+  detalles       String?
+  archivos       Json?
+  created_at     DateTime   @default(now())
+  asignatura     Asignatura @relation(fields: [asignatura_id], references: [id], onDelete: Cascade)
+
+  @@map("examenes")
+}
+
+model CosaQuHacer {
+  id             String   @id @default(uuid())
+  titulo         String
+  descripcion    String?
+  completada     Boolean  @default(false)
+  fecha_creacion DateTime @default(now())
+  prioridad      String   @default("media")
+
+  @@map("cosas_qu_hacer")
+}
