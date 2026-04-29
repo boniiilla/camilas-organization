@@ -1,0 +1,16 @@
+[Unit]
+Description=Camila's Organization App
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/camilas-organization
+ExecStart=/usr/bin/node dist/server/node-build.mjs
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+EnvironmentFile=/home/ubuntu/camilas-organization/.env
+
+[Install]
+WantedBy=multi-user.target

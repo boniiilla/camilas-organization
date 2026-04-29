@@ -32,6 +32,10 @@ export default defineConfig({
         // External dependencies that should not be bundled
         "express",
         "cors",
+        "@prisma/client",
+        "@prisma/adapter-pg",
+        "pg",
+        "dotenv/config",
       ],
       output: {
         format: "es",
