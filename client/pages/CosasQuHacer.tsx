@@ -107,10 +107,10 @@ export default function CosasQuHacerPage() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <h1 className="text-3xl md:text-4xl font-normal tracking-tight text-foreground">
-              Cosas Que Hacer
+              Actividades
             </h1>
             <p className="mt-2 text-muted-foreground">
-              Organiza tus tareas pendientes y haz un seguimiento de lo que necesitas completar.
+              Organiza tus actividades pendientes y haz un seguimiento de lo que necesitas completar.
             </p>
           </div>
           <Dialog open={openDialog} onOpenChange={(open) => {
@@ -124,14 +124,14 @@ export default function CosasQuHacerPage() {
           }}>
             <DialogTrigger asChild>
               <Button>
-                <Plus className="h-4 w-4" /> Añadir cosa
+                <Plus className="h-4 w-4" /> Añadir
               </Button>
             </DialogTrigger>
             <DialogContent className="rounded-3xl">
               <DialogHeader>
-                <DialogTitle>{editingId ? "Editar cosa" : "Nueva cosa que hacer"}</DialogTitle>
+                <DialogTitle>{editingId ? "Editar actividad" : "Nueva actividad"}</DialogTitle>
                 <DialogDescription>
-                  {editingId ? "Modifica los detalles de la cosa." : "Añade una nueva tarea a tu lista."}
+                  {editingId ? "Modifica los detalles de la actividad." : "Añade una nueva actividad a tu lista."}
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-2">
@@ -215,17 +215,22 @@ export default function CosasQuHacerPage() {
       </div>
 
       <Tabs defaultValue="pendientes" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="pendientes">
-            Pendientes ({cosasActivas.length})
-          </TabsTrigger>
-          <TabsTrigger value="altas" className={cosasAltas.length > 0 ? "text-red-600" : ""}>
-            Alta Prioridad ({cosasAltas.length})
-          </TabsTrigger>
-          <TabsTrigger value="completadas">
-            Completadas ({cosasCompletadas.length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto mb-4">
+          <TabsList className="w-max min-w-full">
+            <TabsTrigger value="pendientes" className="flex-1">
+              <span className="sm:hidden">Pend. ({cosasActivas.length})</span>
+              <span className="hidden sm:inline">Pendientes ({cosasActivas.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="altas" className={`flex-1 ${cosasAltas.length > 0 ? "text-red-600" : ""}`}>
+              <span className="sm:hidden">Alta ({cosasAltas.length})</span>
+              <span className="hidden sm:inline">Alta Prioridad ({cosasAltas.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="completadas" className="flex-1">
+              <span className="sm:hidden">Hecho ({cosasCompletadas.length})</span>
+              <span className="hidden sm:inline">Completadas ({cosasCompletadas.length})</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="pendientes">
           {cosasActivas.length === 0 ? (

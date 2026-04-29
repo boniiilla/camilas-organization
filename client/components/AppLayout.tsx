@@ -51,7 +51,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </NavLink>
             <NavLink to="/cosas-que-hacer" className={navLinkClass}>
               <CheckSquare className="h-4 w-4" />
-              <span className="hidden lg:inline">Cosas</span>
+              <span className="hidden lg:inline">Actividades</span>
             </NavLink>
           </nav>
 
@@ -143,7 +143,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <CheckSquare className="h-5 w-5" />
-                Cosas Que Hacer
+                Actividades
               </NavLink>
             </nav>
           </div>
