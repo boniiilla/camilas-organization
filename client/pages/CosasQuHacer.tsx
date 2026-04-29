@@ -101,87 +101,86 @@ export default function CosasQuHacerPage() {
     }
   };
 
+  const dialogContent = (
+    <Dialog open={openDialog} onOpenChange={(open) => {
+      setOpenDialog(open);
+      if (!open) {
+        setEditingId(null);
+        setTitulo("");
+        setDescripcion("");
+        setPrioridad("media");
+      }
+    }}>
+      <DialogTrigger asChild>
+        <Button className="w-full sm:w-auto">
+          <Plus className="h-4 w-4" /> Añadir Actividad
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="rounded-3xl">
+        <DialogHeader>
+          <DialogTitle>{editingId ? "Editar actividad" : "Nueva actividad"}</DialogTitle>
+          <DialogDescription>
+            {editingId ? "Modifica los detalles de la actividad." : "Añade una nueva actividad a tu lista."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-2">
+          <div className="grid gap-2">
+            <Label htmlFor="titulo">Título</Label>
+            <Input
+              id="titulo"
+              autoFocus
+              className="rounded-full"
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Ej. Estudiar matemáticas"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="descripcion">Descripción (opcional)</Label>
+            <textarea
+              id="descripcion"
+              className="h-20 rounded-lg border bg-background px-3 py-2 text-sm"
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Detalles adicionales..."
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="prioridad">Prioridad</Label>
+            <select
+              id="prioridad"
+              className="h-10 rounded-full border bg-background px-3 text-sm"
+              value={prioridad}
+              onChange={(e) => setPrioridad(e.target.value as "baja" | "media" | "alta")}
+            >
+              <option value="baja">Baja</option>
+              <option value="media">Media</option>
+              <option value="alta">Alta</option>
+            </select>
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => setOpenDialog(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={guardarCosa}>{editingId ? "Guardar cambios" : "Guardar"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
     <AppLayout>
-      <div className="mb-8">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <h1 className="text-3xl md:text-4xl font-normal tracking-tight text-foreground">
-              Actividades
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              Organiza tus actividades pendientes y haz un seguimiento de lo que necesitas completar.
-            </p>
-          </div>
-          <Dialog open={openDialog} onOpenChange={(open) => {
-            setOpenDialog(open);
-            if (!open) {
-              setEditingId(null);
-              setTitulo("");
-              setDescripcion("");
-              setPrioridad("media");
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4" /> Añadir
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-3xl">
-              <DialogHeader>
-                <DialogTitle>{editingId ? "Editar actividad" : "Nueva actividad"}</DialogTitle>
-                <DialogDescription>
-                  {editingId ? "Modifica los detalles de la actividad." : "Añade una nueva actividad a tu lista."}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="titulo">Título</Label>
-                  <Input
-                    id="titulo"
-                    autoFocus
-                    className="rounded-full"
-                    value={titulo}
-                    onChange={(e) => setTitulo(e.target.value)}
-                    placeholder="Ej. Estudiar matemáticas"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="descripcion">Descripción (opcional)</Label>
-                  <textarea
-                    id="descripcion"
-                    className="h-20 rounded-lg border bg-background px-3 py-2 text-sm"
-                    value={descripcion}
-                    onChange={(e) => setDescripcion(e.target.value)}
-                    placeholder="Detalles adicionales..."
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="prioridad">Prioridad</Label>
-                  <select
-                    id="prioridad"
-                    className="h-10 rounded-full border bg-background px-3 text-sm"
-                    value={prioridad}
-                    onChange={(e) => setPrioridad(e.target.value as "baja" | "media" | "alta")}
-                  >
-                    <option value="baja">Baja</option>
-                    <option value="media">Media</option>
-                    <option value="alta">Alta</option>
-                  </select>
-                </div>
-              </div>
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => setOpenDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={guardarCosa}>{editingId ? "Guardar cambios" : "Guardar"}</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl md:text-4xl font-normal tracking-tight text-foreground">
+          Actividades
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          Organiza tus actividades pendientes y haz un seguimiento de lo que necesitas completar.
+        </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 mb-8">
+      <div className="grid gap-4 sm:grid-cols-3 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -212,6 +211,10 @@ export default function CosasQuHacerPage() {
             <p className="text-xs text-muted-foreground">Hechas</p>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mb-4">
+        {dialogContent}
       </div>
 
       <Tabs defaultValue="pendientes" className="w-full">

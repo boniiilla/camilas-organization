@@ -1,5 +1,6 @@
 import path from "path";
 import { createServer } from "./index";
+import { seedInitialUser } from "./seed";
 import * as express from "express";
 
 const app = createServer();
@@ -20,10 +21,11 @@ app.use((req, res, next) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`🚀 Fusion Starter server running on port ${port}`);
   console.log(`📱 Frontend: http://localhost:${port}`);
   console.log(`🔧 API: http://localhost:${port}/api`);
+  await seedInitialUser();
 });
 
 // Graceful shutdown

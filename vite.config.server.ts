@@ -36,6 +36,8 @@ export default defineConfig({
         "@prisma/adapter-pg",
         "pg",
         "dotenv/config",
+        "bcryptjs",
+        "jsonwebtoken",
       ],
       output: {
         format: "es",

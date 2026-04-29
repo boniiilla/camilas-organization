@@ -1,7 +1,7 @@
 import { ReactNode, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { BookOpenText, CalendarDays, ClipboardList, Home, Menu, X, CheckSquare } from "lucide-react";
+import { BookOpenText, CalendarDays, ClipboardList, Home, Menu, X, CheckSquare, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface AppLayoutProps {
@@ -18,6 +18,12 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/login");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -54,6 +60,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <span className="hidden lg:inline">Actividades</span>
             </NavLink>
           </nav>
+
+          {/* Logout (desktop) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:flex"
+            onClick={handleLogout}
+            title="Cerrar sesión"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
 
           {/* Mobile Menu Button */}
           <Button
@@ -145,6 +162,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <CheckSquare className="h-5 w-5" />
                 Actividades
               </NavLink>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 rounded-full px-4 py-3 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <LogOut className="h-5 w-5" />
+                Cerrar sesión
+              </button>
             </nav>
           </div>
         )}
