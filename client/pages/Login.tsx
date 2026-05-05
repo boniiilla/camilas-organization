@@ -189,7 +189,7 @@ export default function Login() {
       <div className="login-stage">
         <main className="login-card">
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
-            <img src="/logo.png" alt="Camila's Organization" style={{ height: 72, width: "auto", objectFit: "contain" }} />
+            <img src="/logo.svg" alt="Camila's Organization" style={{ height: 72, width: "auto", objectFit: "contain" }} />
           </div>
 
           <h1 style={{ margin: "0 0 6px", fontSize: 24, fontWeight: 500, letterSpacing: "-0.01em", textAlign: "center", color: "hsl(222 47% 11%)" }}>

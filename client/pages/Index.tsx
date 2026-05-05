@@ -10,9 +10,13 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, CheckCircle2, Plus, BookOpenText } from "lucide-react";
 import { useDB, Asignatura, Tarea, Examen } from "@/hooks/use-db";
+import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import TareaDetailDialog from "@/components/TareaDetailDialog";
 
 export default function Index() {
   const db = useDB();
+  const { toast } = useToast();
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [tareas, setTareas] = useState<Tarea[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
@@ -46,46 +50,52 @@ export default function Index() {
     return examenes.filter((e) => new Date(e.fecha) >= hoy).length;
   }, [examenes]);
 
-  const [nuevaAsig, setNuevaAsig] = useState({ nombre: "", color: "#F9C2FC" });
+  const [nuevaAsig, setNuevaAsig] = useState({ nombre: "", color: "#F9C2FC", profesor: "" });
   const [asignaturaEditando, setAsignaturaEditando] = useState<string | null>(null);
-  const [nuevaTarea, setNuevaTarea] = useState({ asignaturaId: "", titulo: "", fecha: "" });
+  const [nuevaTarea, setNuevaTarea] = useState({ asignaturaId: "", titulo: "", descripcion: "", fecha: "" });
   const [tareaEditando, setTareaEditando] = useState<string | null>(null);
   const [nuevoExamen, setNuevoExamen] = useState({ asignaturaId: "", titulo: "", fecha: "" });
   const [examenEditando, setExamenEditando] = useState<string | null>(null);
   const [openAsigDialog, setOpenAsigDialog] = useState(false);
   const [openTareaDialog, setOpenTareaDialog] = useState(false);
   const [openExamenDialog, setOpenExamenDialog] = useState(false);
+  const [selectedTarea, setSelectedTarea] = useState<Tarea | null>(null);
+  const [openDetailDialog, setOpenDetailDialog] = useState(false);
 
   const addAsignatura = async () => {
     const nombre = nuevaAsig.nombre.trim();
     if (!nombre) return;
 
+    const profesor = nuevaAsig.profesor.trim() || undefined;
     if (asignaturaEditando) {
-      await db.updateAsignatura(asignaturaEditando, { nombre, color: nuevaAsig.color });
-      setAsignaturas((s) => s.map(a => a.id === asignaturaEditando ? { ...a, nombre, color: nuevaAsig.color } : a));
+      await db.updateAsignatura(asignaturaEditando, { nombre, color: nuevaAsig.color, profesor });
+      setAsignaturas((s) => s.map(a => a.id === asignaturaEditando ? { ...a, nombre, color: nuevaAsig.color, profesor } : a));
       setAsignaturaEditando(null);
     } else {
-      const newAsig = await db.addAsignatura({ nombre, color: nuevaAsig.color });
+      const newAsig = await db.addAsignatura({ nombre, color: nuevaAsig.color, profesor });
       setAsignaturas((s) => [...s, newAsig]);
     }
 
-    setNuevaAsig({ nombre: "", color: "#F9C2FC" });
+    setNuevaAsig({ nombre: "", color: "#F9C2FC", profesor: "" });
     setOpenAsigDialog(false);
   };
 
   const addTarea = async () => {
     if (!nuevaTarea.asignaturaId || !nuevaTarea.titulo.trim() || !nuevaTarea.fecha) return;
 
+    const descripcion = nuevaTarea.descripcion.trim() || undefined;
     if (tareaEditando) {
       await db.updateTarea(tareaEditando, {
         asignatura_id: nuevaTarea.asignaturaId,
         titulo: nuevaTarea.titulo.trim(),
+        descripcion,
         fecha: nuevaTarea.fecha,
       });
       setTareas((s) => s.map(t => t.id === tareaEditando ? {
         ...t,
         asignatura_id: nuevaTarea.asignaturaId,
         titulo: nuevaTarea.titulo.trim(),
+        descripcion,
         fecha: nuevaTarea.fecha
       } : t));
       setTareaEditando(null);
@@ -93,13 +103,14 @@ export default function Index() {
       const newTarea = await db.addTarea({
         asignatura_id: nuevaTarea.asignaturaId,
         titulo: nuevaTarea.titulo.trim(),
+        descripcion,
         fecha: nuevaTarea.fecha,
         hecha: false
       });
       setTareas((s) => [...s, newTarea]);
     }
 
-    setNuevaTarea({ asignaturaId: "", titulo: "", fecha: "" });
+    setNuevaTarea({ asignaturaId: "", titulo: "", descripcion: "", fecha: "" });
     setOpenTareaDialog(false);
   };
 
@@ -136,8 +147,12 @@ export default function Index() {
     const tarea = tareas.find((t) => t.id === id);
     if (!tarea) return;
     const newHecha = !tarea.hecha;
-    await db.updateTarea(id, { hecha: newHecha });
-    setTareas((s) => s.map((t) => (t.id === id ? { ...t, hecha: newHecha } : t)));
+    try {
+      await db.updateTarea(id, { hecha: newHecha });
+      setTareas((s) => s.map((t) => (t.id === id ? { ...t, hecha: newHecha } : t)));
+    } catch (e: any) {
+      toast({ title: "No se puede marcar como hecha", description: e.message, variant: "destructive" });
+    }
   };
 
   const eliminarTarea = async (id: string) => {
@@ -269,6 +284,16 @@ export default function Index() {
                     />
                   </div>
                   <div className="grid gap-2">
+                    <Label htmlFor="profesor">Profesor <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+                    <Input
+                      id="profesor"
+                      className="rounded-full"
+                      value={nuevaAsig.profesor}
+                      onChange={(e) => setNuevaAsig((s) => ({ ...s, profesor: e.target.value }))}
+                      placeholder="Ej. Juan García"
+                    />
+                  </div>
+                  <div className="grid gap-2">
                     <Label htmlFor="color">Color</Label>
                     <input
                       id="color"
@@ -301,8 +326,11 @@ export default function Index() {
                 <Card key={a.id} className="overflow-hidden border-l-4 rounded-3xl" style={{ borderLeftColor: a.color }}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span className="break-words flex-1">{a.nombre}</span>
-                      <span className="h-3 w-3 flex-shrink-0 rounded-full" style={{ backgroundColor: a.color }} />
+                      <div className="flex-1 min-w-0">
+                        <span className="break-words block">{a.nombre}</span>
+                        {a.profesor && <span className="text-xs font-normal text-muted-foreground">Prof. {a.profesor}</span>}
+                      </div>
+                      <span className="h-3 w-3 flex-shrink-0 rounded-full ml-2" style={{ backgroundColor: a.color }} />
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="flex items-center justify-between gap-2">
@@ -312,7 +340,7 @@ export default function Index() {
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => {
                         setAsignaturaEditando(a.id);
-                        setNuevaAsig({ nombre: a.nombre, color: a.color });
+                        setNuevaAsig({ nombre: a.nombre, color: a.color, profesor: a.profesor ?? "" });
                         setOpenAsigDialog(true);
                       }}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
@@ -335,7 +363,7 @@ export default function Index() {
               setOpenTareaDialog(open);
               if (!open) {
                 setTareaEditando(null);
-                setNuevaTarea({ asignaturaId: "", titulo: "", fecha: "" });
+                setNuevaTarea({ asignaturaId: "", titulo: "", descripcion: "", fecha: "" });
               }
             }}>
               <DialogTrigger asChild>
@@ -351,18 +379,16 @@ export default function Index() {
                 <div className="grid gap-4 py-2">
                   <div className="grid gap-2">
                     <Label>Asignatura</Label>
-                    <select
-                      className="h-10 rounded-full border bg-background px-3 text-sm"
-                      value={nuevaTarea.asignaturaId}
-                      onChange={(e) => setNuevaTarea((s) => ({ ...s, asignaturaId: e.target.value }))}
-                    >
-                      <option value="">Selecciona</option>
-                      {asignaturas.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.nombre}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={nuevaTarea.asignaturaId} onValueChange={(v) => setNuevaTarea((s) => ({ ...s, asignaturaId: v }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {asignaturas.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid gap-2">
                     <Label>Título</Label>
@@ -371,6 +397,16 @@ export default function Index() {
                       value={nuevaTarea.titulo}
                       onChange={(e) => setNuevaTarea((s) => ({ ...s, titulo: e.target.value }))}
                       placeholder="Ej. Resumen del tema 2"
+                      maxLength={75}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Descripción <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+                    <Input
+                      className="rounded-full"
+                      value={nuevaTarea.descripcion}
+                      onChange={(e) => setNuevaTarea((s) => ({ ...s, descripcion: e.target.value }))}
+                      placeholder="Añade más detalles..."
                     />
                   </div>
                   <div className="grid gap-2">
@@ -407,49 +443,39 @@ export default function Index() {
                 .map((t) => {
                   const asig = asignaturas.find((a) => a.id === t.asignatura_id);
                   return (
-                    <Card key={t.id} className="rounded-3xl">
-                      <CardContent className="flex items-center justify-between gap-4 py-4">
-                        <div className="flex items-center gap-3">
+                    <Card
+                      key={t.id}
+                      className="rounded-3xl cursor-pointer transition-shadow hover:shadow-md"
+                      onClick={() => { setSelectedTarea(t); setOpenDetailDialog(true); }}
+                    >
+                      <CardContent className="py-4 flex flex-col gap-2">
+                        <div className="flex items-start gap-3">
                           <input
                             type="checkbox"
                             checked={!!t.hecha}
-                            onChange={() => toggleTarea(t.id)}
-                            className="h-5 w-5 rounded-full accent-primary"
+                            onChange={(e) => { e.stopPropagation(); toggleTarea(t.id); }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-0.5 h-5 w-5 flex-shrink-0 rounded-full accent-primary"
                           />
-                          <div>
-                            <div className={`font-medium ${t.hecha ? "line-through text-muted-foreground" : ""}`}>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-medium leading-snug ${t.hecha ? "line-through text-muted-foreground" : ""}`}>
                               {t.titulo}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {asig ? (
-                                <span className="inline-flex items-center gap-2">
-                                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: asig.color }} />
-                                  {asig.nombre}
-                                </span>
-                              ) : null}
-                              <span className="mx-2">•</span>
-                              vence {new Date(t.fecha).toLocaleDateString()}
-                            </div>
+                            </p>
+                            {t.descripcion && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{t.descripcion}</p>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between">
                           <Badge variant={t.hecha ? "secondary" : "default"} className="rounded-full">
                             {t.hecha ? "Hecha" : "Pendiente"}
                           </Badge>
-                          <Button variant="ghost" size="icon" onClick={() => {
-                            setTareaEditando(t.id);
-                            setNuevaTarea({
-                              asignaturaId: t.asignatura_id || "",
-                              titulo: t.titulo,
-                              fecha: t.fecha
-                            });
-                            setOpenTareaDialog(true);
-                          }}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => eliminarTarea(t.id)}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {asig && <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: asig.color }} />}
+                          {asig && <span>{asig.nombre}</span>}
+                          {asig && <span>•</span>}
+                          <span>vence {new Date(t.fecha + "T00:00:00").toLocaleDateString()}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -482,18 +508,16 @@ export default function Index() {
                 <div className="grid gap-4 py-2">
                   <div className="grid gap-2">
                     <Label>Asignatura</Label>
-                    <select
-                      className="h-10 rounded-full border bg-background px-3 text-sm"
-                      value={nuevoExamen.asignaturaId}
-                      onChange={(e) => setNuevoExamen((s) => ({ ...s, asignaturaId: e.target.value }))}
-                    >
-                      <option value="">Selecciona</option>
-                      {asignaturas.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.nombre}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={nuevoExamen.asignaturaId} onValueChange={(v) => setNuevoExamen((s) => ({ ...s, asignaturaId: v }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {asignaturas.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid gap-2">
                     <Label>Título</Label>
@@ -537,41 +561,17 @@ export default function Index() {
                 .sort((a, b) => a.fecha.localeCompare(b.fecha))
                 .map((e) => {
                   const asig = asignaturas.find((a) => a.id === e.asignatura_id);
+                  const fechaObj = new Date(e.fecha + "T00:00:00");
+                  const esPasado = fechaObj < new Date();
                   return (
-                    <Card key={e.id} className="rounded-3xl">
-                      <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <div className="flex-1">
-                          <div className="font-medium text-base">{e.titulo}</div>
-                          <div className="mt-1 text-sm text-muted-foreground">
-                            {new Date(e.fecha).toLocaleDateString()} — {asig?.nombre ?? "Sin asignatura"}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 self-end sm:self-auto">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setExamenEditando(e.id);
-                              setNuevoExamen({
-                                asignaturaId: e.asignatura_id || "",
-                                titulo: e.titulo,
-                                fecha: e.fecha
-                              });
-                              setOpenExamenDialog(true);
-                            }}
-                            title="Editar examen"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive"
-                            onClick={() => eliminarExamen(e.id)}
-                            title="Eliminar examen"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                          </Button>
+                    <Card key={e.id} className={`rounded-3xl ${esPasado ? "opacity-60" : ""}`}>
+                      <CardContent className="py-4 flex flex-col gap-1">
+                        <div className="font-medium leading-snug">{e.titulo}</div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {asig && <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: asig.color }} />}
+                          {asig && <span>{asig.nombre}</span>}
+                          {asig && <span>•</span>}
+                          <span>{fechaObj.toLocaleDateString("es-ES", { day: "numeric", month: "long" })}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -581,6 +581,20 @@ export default function Index() {
           )}
         </TabsContent>
       </Tabs>
+
+      <TareaDetailDialog
+        tarea={selectedTarea}
+        asignaturas={asignaturas}
+        open={openDetailDialog}
+        onClose={() => { setOpenDetailDialog(false); setSelectedTarea(null); }}
+        onEdit={(t) => {
+          setTareaEditando(t.id);
+          setNuevaTarea({ asignaturaId: t.asignatura_id || "", titulo: t.titulo, descripcion: t.descripcion ?? "", fecha: t.fecha });
+          setOpenTareaDialog(true);
+        }}
+        onDelete={eliminarTarea}
+        onToggle={toggleTarea}
+      />
     </AppLayout>
   );
 }

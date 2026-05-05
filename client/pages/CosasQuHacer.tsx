@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, CheckCircle2, Circle, AlertCircle } from "lucide-react";
 import { useDB, CosaQuHacer } from "@/hooks/use-db";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function CosasQuHacerPage() {
   const db = useDB();
@@ -147,16 +148,16 @@ export default function CosasQuHacerPage() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="prioridad">Prioridad</Label>
-            <select
-              id="prioridad"
-              className="h-10 rounded-full border bg-background px-3 text-sm"
-              value={prioridad}
-              onChange={(e) => setPrioridad(e.target.value as "baja" | "media" | "alta")}
-            >
-              <option value="baja">Baja</option>
-              <option value="media">Media</option>
-              <option value="alta">Alta</option>
-            </select>
+            <Select value={prioridad} onValueChange={(v) => setPrioridad(v as "baja" | "media" | "alta")}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="baja">Baja</SelectItem>
+                <SelectItem value="media">Media</SelectItem>
+                <SelectItem value="alta">Alta</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <DialogFooter className="gap-2">

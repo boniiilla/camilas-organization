@@ -16,7 +16,7 @@ export default function AsignaturasPage() {
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
-  const [nuevaAsig, setNuevaAsig] = useState({ nombre: "", color: "#F9C2FC" });
+  const [nuevaAsig, setNuevaAsig] = useState({ nombre: "", color: "#F9C2FC", profesor: "" });
   const [asignaturaEditando, setAsignaturaEditando] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,16 +40,17 @@ export default function AsignaturasPage() {
     const nombre = nuevaAsig.nombre.trim();
     if (!nombre) return;
 
+    const profesor = nuevaAsig.profesor.trim() || undefined;
     if (asignaturaEditando) {
-      await db.updateAsignatura(asignaturaEditando, { nombre, color: nuevaAsig.color });
-      setAsignaturas((s) => s.map(a => a.id === asignaturaEditando ? { ...a, nombre, color: nuevaAsig.color } : a));
+      await db.updateAsignatura(asignaturaEditando, { nombre, color: nuevaAsig.color, profesor });
+      setAsignaturas((s) => s.map(a => a.id === asignaturaEditando ? { ...a, nombre, color: nuevaAsig.color, profesor } : a));
       setAsignaturaEditando(null);
     } else {
-      const newAsig = await db.addAsignatura({ nombre, color: nuevaAsig.color });
+      const newAsig = await db.addAsignatura({ nombre, color: nuevaAsig.color, profesor });
       setAsignaturas((s) => [...s, newAsig]);
     }
 
-    setNuevaAsig({ nombre: "", color: "#F9C2FC" });
+    setNuevaAsig({ nombre: "", color: "#F9C2FC", profesor: "" });
     setOpenDialog(false);
   };
 
@@ -107,6 +108,15 @@ export default function AsignaturasPage() {
                   onChange={(e) => setNuevaAsig((s) => ({ ...s, nombre: e.target.value }))}
                   placeholder="Ej. Matemáticas, Historia, Biología..."
                   onKeyDown={(e) => e.key === "Enter" && addAsignatura()}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="profesor">Profesor <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+                <Input
+                  id="profesor"
+                  value={nuevaAsig.profesor}
+                  onChange={(e) => setNuevaAsig((s) => ({ ...s, profesor: e.target.value }))}
+                  placeholder="Ej. Juan García"
                 />
               </div>
               <div className="grid gap-2">
@@ -172,24 +182,18 @@ export default function AsignaturasPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2">
-                        <span className="break-words flex-1">{asig.nombre}</span>
-                        <span
-                          className="h-3 w-3 flex-shrink-0 rounded-full"
-                          style={{ backgroundColor: asig.color }}
-                        />
-                      </CardTitle>
-                      <CardDescription className="mt-2">
-                        Creada el {new Date().toLocaleDateString()}
-                      </CardDescription>
+                      <CardTitle className="break-words">{asig.nombre}</CardTitle>
+                      {asig.profesor && (
+                        <CardDescription className="mt-1">Prof. {asig.profesor}</CardDescription>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => {
                           setAsignaturaEditando(asig.id);
-                          setNuevaAsig({ nombre: asig.nombre, color: asig.color });
+                          setNuevaAsig({ nombre: asig.nombre, color: asig.color, profesor: asig.profesor ?? "" });
                           setOpenDialog(true);
                         }}
                       >
@@ -223,6 +227,13 @@ export default function AsignaturasPage() {
                       <Calendar className="h-4 w-4" />
                       Total exámenes: {examenesAsig.length}
                     </p>
+                  </div>
+                  <div className="flex justify-end mt-2">
+                    <span
+                      className="h-5 w-5 rounded-full shadow-sm"
+                      style={{ backgroundColor: asig.color }}
+                      title={asig.color}
+                    />
                   </div>
                 </CardContent>
               </Card>

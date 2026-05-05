@@ -1,4 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import ReminderButton from "@/components/ReminderButton";
+import TareaDetailDialog from "@/components/TareaDetailDialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,16 +13,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar, CheckCircle2, Circle, Plus, Trash2, List } from "lucide-react";
 import { useDB, Asignatura, Tarea } from "@/hooks/use-db";
+import { useToast } from "@/hooks/use-toast";
+
+const apiGet = (path: string) =>
+  fetch(path, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).then((r) => r.json());
 
 export default function TareasPage() {
   const db = useDB();
+  const { toast } = useToast();
+
+  const { data: reminders = [] } = useQuery({
+    queryKey: ["reminders"],
+    queryFn: () => apiGet("/api/reminders"),
+  });
+  const reminderMap = Object.fromEntries((reminders as any[]).map((r: any) => [r.reference_id, r]));
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [tareas, setTareas] = useState<Tarea[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
-  const [nuevaTarea, setNuevaTarea] = useState({ asignaturaId: "", titulo: "", fecha: "" });
+  const [nuevaTarea, setNuevaTarea] = useState({ asignaturaId: "", titulo: "", descripcion: "", fecha: "" });
   const [tareaEditando, setTareaEditando] = useState<string | null>(null);
   const [filtroAsignatura, setFiltroAsignatura] = useState<string>("todas");
+  const [selectedTarea, setSelectedTarea] = useState<Tarea | null>(null);
+  const [openDetailDialog, setOpenDetailDialog] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -35,16 +52,19 @@ export default function TareasPage() {
   const addTarea = async () => {
     if (!nuevaTarea.asignaturaId || !nuevaTarea.titulo.trim() || !nuevaTarea.fecha) return;
 
+    const descripcion = nuevaTarea.descripcion.trim() || undefined;
     if (tareaEditando) {
       await db.updateTarea(tareaEditando, {
         asignatura_id: nuevaTarea.asignaturaId,
         titulo: nuevaTarea.titulo.trim(),
+        descripcion,
         fecha: nuevaTarea.fecha,
       });
       setTareas((s) => s.map(t => t.id === tareaEditando ? {
         ...t,
         asignatura_id: nuevaTarea.asignaturaId,
         titulo: nuevaTarea.titulo.trim(),
+        descripcion,
         fecha: nuevaTarea.fecha
       } : t));
       setTareaEditando(null);
@@ -52,13 +72,14 @@ export default function TareasPage() {
       const newTarea = await db.addTarea({
         asignatura_id: nuevaTarea.asignaturaId,
         titulo: nuevaTarea.titulo.trim(),
+        descripcion,
         fecha: nuevaTarea.fecha,
         hecha: false,
       });
       setTareas((s) => [...s, newTarea]);
     }
 
-    setNuevaTarea({ asignaturaId: "", titulo: "", fecha: "" });
+    setNuevaTarea({ asignaturaId: "", titulo: "", descripcion: "", fecha: "" });
     setOpenDialog(false);
   };
 
@@ -66,8 +87,12 @@ export default function TareasPage() {
     const tarea = tareas.find((t) => t.id === id);
     if (!tarea) return;
     const newHecha = !tarea.hecha;
-    await db.updateTarea(id, { hecha: newHecha });
-    setTareas((s) => s.map((t) => (t.id === id ? { ...t, hecha: newHecha } : t)));
+    try {
+      await db.updateTarea(id, { hecha: newHecha });
+      setTareas((s) => s.map((t) => (t.id === id ? { ...t, hecha: newHecha } : t)));
+    } catch (e: any) {
+      toast({ title: "No se puede marcar como hecha", description: e.message, variant: "destructive" });
+    }
   };
 
   const eliminarTarea = async (id: string) => {
@@ -80,6 +105,7 @@ export default function TareasPage() {
     setNuevaTarea({
       asignaturaId: tarea.asignatura_id || "",
       titulo: tarea.titulo,
+      descripcion: tarea.descripcion ?? "",
       fecha: tarea.fecha
     });
     setOpenDialog(true);
@@ -163,25 +189,23 @@ export default function TareasPage() {
           <Label htmlFor="filtro" className="text-sm">
             Filtrar por:
           </Label>
-          <select
-            id="filtro"
-            className="h-9 rounded-full border bg-background px-3 text-sm"
-            value={filtroAsignatura}
-            onChange={(e) => setFiltroAsignatura(e.target.value)}
-          >
-            <option value="todas">Todas las asignaturas</option>
-            {asignaturas.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nombre}
-              </option>
-            ))}
-          </select>
+          <Select value={filtroAsignatura} onValueChange={setFiltroAsignatura}>
+            <SelectTrigger className="h-9 w-52">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas las asignaturas</SelectItem>
+              {asignaturas.map((a) => (
+                <SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Dialog open={openDialog} onOpenChange={(open) => {
           setOpenDialog(open);
           if (!open) {
             setTareaEditando(null);
-            setNuevaTarea({ asignaturaId: "", titulo: "", fecha: "" });
+            setNuevaTarea({ asignaturaId: "", titulo: "", descripcion: "", fecha: "" });
           }
         }}>
           <DialogTrigger asChild>
@@ -197,19 +221,16 @@ export default function TareasPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="asignatura">Asignatura</Label>
-                <select
-                  id="asignatura"
-                  className="h-10 rounded-full border bg-background px-3 text-sm"
-                  value={nuevaTarea.asignaturaId}
-                  onChange={(e) => setNuevaTarea((s) => ({ ...s, asignaturaId: e.target.value }))}
-                >
-                  <option value="">Selecciona una asignatura</option>
-                  {asignaturas.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.nombre}
-                    </option>
-                  ))}
-                </select>
+                <Select value={nuevaTarea.asignaturaId} onValueChange={(v) => setNuevaTarea((s) => ({ ...s, asignaturaId: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una asignatura" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {asignaturas.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="titulo">Título de la tarea</Label>
@@ -218,6 +239,16 @@ export default function TareasPage() {
                   value={nuevaTarea.titulo}
                   onChange={(e) => setNuevaTarea((s) => ({ ...s, titulo: e.target.value }))}
                   placeholder="Ej. Ejercicios páginas 45-50"
+                  maxLength={75}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="descripcion">Descripción <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+                <Input
+                  id="descripcion"
+                  value={nuevaTarea.descripcion}
+                  onChange={(e) => setNuevaTarea((s) => ({ ...s, descripcion: e.target.value }))}
+                  placeholder="Añade más detalles..."
                 />
               </div>
               <div className="grid gap-2">
@@ -234,7 +265,7 @@ export default function TareasPage() {
               <Button variant="outline" onClick={() => setOpenDialog(false)}>
                 Cancelar
               </Button>
-              <Button onClick={addTarea}>Crear tarea</Button>
+              <Button onClick={addTarea}>{tareaEditando ? 'Guardar cambios' : 'Crear tarea'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -293,47 +324,46 @@ export default function TareasPage() {
                       return (
                         <div
                           key={tarea.id}
-                          className="flex items-center justify-between gap-4 rounded-2xl border p-3 transition-colors hover:bg-muted/50"
+                          className="flex flex-col gap-2 rounded-2xl border p-3 transition-colors hover:bg-muted/50 cursor-pointer"
+                          onClick={() => { setSelectedTarea(tarea); setOpenDetailDialog(true); }}
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-start gap-3">
                             <input
                               type="checkbox"
                               checked={!!tarea.hecha}
-                              onChange={() => toggleTarea(tarea.id)}
-                              className="h-5 w-5 cursor-pointer rounded-full accent-primary"
+                              onChange={(e) => { e.stopPropagation(); toggleTarea(tarea.id); }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-0.5 h-5 w-5 cursor-pointer flex-shrink-0 rounded-full accent-primary"
                             />
-                            <div>
-                              <p className={`font-medium ${tarea.hecha ? "line-through text-muted-foreground" : ""}`}>
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-medium leading-snug ${tarea.hecha ? "line-through text-muted-foreground" : ""}`}>
                                 {tarea.titulo}
                               </p>
-                              {asig && (
-                                <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: asig.color }} />
-                                  {asig.nombre}
-                                </p>
+                              {tarea.descripcion && (
+                                <p className="text-xs text-muted-foreground mt-0.5">{tarea.descripcion}</p>
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="flex-shrink-0"
-                              onClick={() => abrirParaEditar(tarea)}
-                              title="Editar"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="flex-shrink-0"
-                              onClick={() => eliminarTarea(tarea.id)}
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                          <div className="flex items-center justify-between">
+                            <Badge variant={tarea.hecha ? "secondary" : "default"} className="rounded-full text-xs">
+                              {tarea.hecha ? "Hecha" : "Pendiente"}
+                            </Badge>
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <ReminderButton
+                                referenceId={tarea.id}
+                                type="tarea"
+                                title={tarea.titulo}
+                                dueDate={tarea.fecha}
+                                reminder={reminderMap[tarea.id]}
+                              />
+                            </div>
                           </div>
+                          {asig && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: asig.color }} />
+                              <span>{asig.nombre}</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -362,41 +392,48 @@ export default function TareasPage() {
               .map((tarea) => {
                 const asig = asignaturas.find((a) => a.id === tarea.asignatura_id);
                 return (
-                  <Card key={tarea.id}>
-                    <CardContent className="flex items-center justify-between gap-4 py-4">
-                      <div className="flex items-center gap-3">
+                  <Card
+                    key={tarea.id}
+                    className="cursor-pointer transition-shadow hover:shadow-md"
+                    onClick={() => { setSelectedTarea(tarea); setOpenDetailDialog(true); }}
+                  >
+                    <CardContent className="py-4 flex flex-col gap-2">
+                      <div className="flex items-start gap-3">
                         <input
                           type="checkbox"
                           checked={!!tarea.hecha}
-                          onChange={() => toggleTarea(tarea.id)}
-                          className="h-5 w-5 cursor-pointer rounded-full accent-primary"
+                          onChange={(e) => { e.stopPropagation(); toggleTarea(tarea.id); }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-0.5 h-5 w-5 cursor-pointer flex-shrink-0 rounded-full accent-primary"
                         />
-                        <div>
-                          <p className={`font-medium ${tarea.hecha ? "line-through text-muted-foreground" : ""}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-medium leading-snug ${tarea.hecha ? "line-through text-muted-foreground" : ""}`}>
                             {tarea.titulo}
                           </p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {asig && (
-                              <span className="inline-flex items-center gap-2">
-                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: asig.color }} />
-                                {asig.nombre}
-                              </span>
-                            )}
-                            <span className="mx-2">•</span>
-                            {new Date(tarea.fecha + "T00:00:00").toLocaleDateString()}
-                          </p>
+                          {tarea.descripcion && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{tarea.descripcion}</p>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between">
                         <Badge variant={tarea.hecha ? "secondary" : "default"}>
                           {tarea.hecha ? "Completada" : "Pendiente"}
                         </Badge>
-                        <Button variant="ghost" size="icon" onClick={() => abrirParaEditar(tarea)} title="Editar">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => eliminarTarea(tarea.id)} title="Eliminar">
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <ReminderButton
+                            referenceId={tarea.id}
+                            type="tarea"
+                            title={tarea.titulo}
+                            dueDate={tarea.fecha}
+                            reminder={reminderMap[tarea.id]}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {asig && <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: asig.color }} />}
+                        {asig && <span>{asig.nombre}</span>}
+                        {asig && <span>•</span>}
+                        <span>vence {new Date(tarea.fecha + "T00:00:00").toLocaleDateString()}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -405,6 +442,16 @@ export default function TareasPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <TareaDetailDialog
+        tarea={selectedTarea}
+        asignaturas={asignaturas}
+        open={openDetailDialog}
+        onClose={() => { setOpenDetailDialog(false); setSelectedTarea(null); }}
+        onEdit={(t) => abrirParaEditar(t)}
+        onDelete={eliminarTarea}
+        onToggle={toggleTarea}
+      />
     </AppLayout>
   );
 }

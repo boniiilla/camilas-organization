@@ -1,4 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import ReminderButton from "@/components/ReminderButton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,8 +15,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Calendar, CalendarDays, Plus, Trash2, List, Clock, FileText, Star, Upload, Download, X, MoreVertical, Pencil } from "lucide-react";
 import { useDB, Asignatura, Examen } from "@/hooks/use-db";
 
+const apiGet = (path: string) =>
+  fetch(path, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).then((r) => r.json());
+
 export default function ExamenesPage() {
   const db = useDB();
+
+  const { data: reminders = [] } = useQuery({
+    queryKey: ["reminders"],
+    queryFn: () => apiGet("/api/reminders"),
+  });
+  const reminderMap = Object.fromEntries((reminders as any[]).map((r: any) => [r.reference_id, r]));
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [examenes, setExamenes] = useState<Examen[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +39,9 @@ export default function ExamenesPage() {
   // Detalles form
   const [nota, setNota] = useState<string>("");
   const [detalles, setDetalles] = useState<string>("");
-  const [archivos, setArchivos] = useState<Array<{ nombre: string; contenido: string }>>([]);
+  const [enlaces, setEnlaces] = useState<Array<{ nombre: string; url: string }>>([]);
+  const [nuevoEnlaceUrl, setNuevoEnlaceUrl] = useState("");
+  const [nuevoEnlaceNombre, setNuevoEnlaceNombre] = useState("");
 
   useEffect(() => {
     const loadData = async () => {
@@ -89,14 +103,18 @@ export default function ExamenesPage() {
 
     if (examen.archivos) {
       try {
-        setArchivos(JSON.parse(examen.archivos));
+        const parsed = JSON.parse(examen.archivos as string);
+        // Support new {nombre, url} format; skip legacy base64 entries
+        setEnlaces(parsed.filter((e: any) => e.url && !e.contenido));
       } catch {
-        setArchivos([]);
+        setEnlaces([]);
       }
     } else {
-      setArchivos([]);
+      setEnlaces([]);
     }
 
+    setNuevoEnlaceUrl("");
+    setNuevoEnlaceNombre("");
     setOpenDetallesDialog(true);
   };
 
@@ -105,7 +123,7 @@ export default function ExamenesPage() {
 
     const notaNum = nota ? parseFloat(nota) : null;
     const detallesVal = detalles ? detalles : null;
-    const archivosJson = archivos.length > 0 ? JSON.stringify(archivos) : null;
+    const archivosJson = enlaces.length > 0 ? JSON.stringify(enlaces) : null;
 
     await db.updateExamen(examenSeleccionado.id, {
       nota: notaNum,
@@ -123,34 +141,20 @@ export default function ExamenesPage() {
 
     setOpenDetallesDialog(false);
     setExamenSeleccionado(null);
-    setNota("");
-    setDetalles("");
-    setArchivos([]);
+    setNota(""); setDetalles(""); setEnlaces([]); setNuevoEnlaceUrl(""); setNuevoEnlaceNombre("");
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result as string;
-        setArchivos((prev) => [...prev, { nombre: file.name, contenido: base64 }]);
-      };
-      reader.readAsDataURL(file);
-    });
+  const añadirEnlace = () => {
+    const url = nuevoEnlaceUrl.trim();
+    if (!url) return;
+    const nombre = nuevoEnlaceNombre.trim() || url;
+    setEnlaces((prev) => [...prev, { nombre, url }]);
+    setNuevoEnlaceUrl("");
+    setNuevoEnlaceNombre("");
   };
 
-  const eliminarArchivo = (index: number) => {
-    setArchivos((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const descargarArchivo = (archivo: { nombre: string; contenido: string }) => {
-    const link = document.createElement("a");
-    link.href = archivo.contenido;
-    link.download = archivo.nombre;
-    link.click();
+  const eliminarEnlace = (index: number) => {
+    setEnlaces((prev) => prev.filter((_, i) => i !== index));
   };
 
   const eliminarExamen = async (id: string) => {
@@ -239,19 +243,17 @@ export default function ExamenesPage() {
           <Label htmlFor="filtro" className="text-sm">
             Filtrar por:
           </Label>
-          <select
-            id="filtro"
-            className="h-9 rounded-full border bg-background px-3 text-sm"
-            value={filtroAsignatura}
-            onChange={(e) => setFiltroAsignatura(e.target.value)}
-          >
-            <option value="todas">Todas las asignaturas</option>
-            {asignaturas.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nombre}
-              </option>
-            ))}
-          </select>
+          <Select value={filtroAsignatura} onValueChange={setFiltroAsignatura}>
+            <SelectTrigger className="h-9 w-52">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas las asignaturas</SelectItem>
+              {asignaturas.map((a) => (
+                <SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Dialog open={openDialog} onOpenChange={(open) => {
           setOpenDialog(open);
@@ -273,19 +275,16 @@ export default function ExamenesPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="asignatura">Asignatura</Label>
-                <select
-                  id="asignatura"
-                  className="h-10 rounded-full border bg-background px-3 text-sm"
-                  value={nuevoExamen.asignaturaId}
-                  onChange={(e) => setNuevoExamen((s) => ({ ...s, asignaturaId: e.target.value }))}
-                >
-                  <option value="">Selecciona una asignatura</option>
-                  {asignaturas.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.nombre}
-                    </option>
-                  ))}
-                </select>
+                <Select value={nuevoExamen.asignaturaId} onValueChange={(v) => setNuevoExamen((s) => ({ ...s, asignaturaId: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una asignatura" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {asignaturas.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="titulo">Tema del examen</Label>
@@ -351,60 +350,44 @@ export default function ExamenesPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label>Apuntes / Archivos</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="file"
-                  multiple
-                  onChange={handleFileUpload}
-                  className="cursor-pointer"
-                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
-                />
-                <Button type="button" size="icon" variant="outline">
-                  <Upload className="h-4 w-4" />
-                </Button>
-              </div>
-              {archivos.length > 0 && (
-                <div className="mt-2 space-y-2">
-                  {archivos.map((archivo, index) => (
-                    <div key={index} className="flex items-center justify-between rounded-2xl border p-3">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-primary" />
-                        <span className="text-sm">{archivo.nombre}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => window.open(archivo.contenido, '_blank')}
-                          title="Ver archivo"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => descargarArchivo(archivo)}
-                          title="Descargar archivo"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => eliminarArchivo(index)}
-                          title="Eliminar archivo"
-                        >
-                          <X className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+              <Label>Archivos / Apuntes</Label>
+              <div className="space-y-2">
+                {enlaces.map((enlace, index) => (
+                  <div key={index} className="flex items-center justify-between rounded-2xl border px-3 py-2 gap-2">
+                    <a
+                      href={enlace.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-primary hover:underline min-w-0 flex-1"
+                    >
+                      <FileText className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">{enlace.nombre}</span>
+                    </a>
+                    <Button type="button" size="icon" variant="ghost" onClick={() => eliminarEnlace(index)}>
+                      <X className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex flex-col gap-2">
+                  <Input
+                    value={nuevoEnlaceNombre}
+                    onChange={(e) => setNuevoEnlaceNombre(e.target.value)}
+                    placeholder="Nombre del enlace (opcional)"
+                  />
+                  <div className="flex gap-2">
+                    <Input
+                      value={nuevoEnlaceUrl}
+                      onChange={(e) => setNuevoEnlaceUrl(e.target.value)}
+                      placeholder="https://..."
+                      onKeyDown={(e) => e.key === "Enter" && añadirEnlace()}
+                      className="flex-1"
+                    />
+                    <Button type="button" variant="outline" onClick={añadirEnlace} disabled={!nuevoEnlaceUrl.trim()}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -516,6 +499,13 @@ export default function ExamenesPage() {
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                             </Button>
+                            <ReminderButton
+                              referenceId={examen.id}
+                              type="examen"
+                              title={examen.titulo}
+                              dueDate={examen.fecha}
+                              reminder={reminderMap[examen.id]}
+                            />
                             <Button
                               variant="ghost"
                               size="icon"
@@ -642,6 +632,13 @@ export default function ExamenesPage() {
                           }}>
                             <Pencil className="h-4 w-4" />
                           </Button>
+                          <ReminderButton
+                            referenceId={examen.id}
+                            type="examen"
+                            title={examen.titulo}
+                            dueDate={examen.fecha}
+                            reminder={reminderMap[examen.id]}
+                          />
                           <Button variant="ghost" size="icon" onClick={() => abrirDetalles(examen)} title="Ver detalles">
                             <Star className="h-4 w-4" />
                           </Button>

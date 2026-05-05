@@ -9,14 +9,14 @@ router.get('/', async (_req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { nombre, color } = req.body;
-  const data = await prisma.asignatura.create({ data: { nombre, color } });
+  const { nombre, color, profesor } = req.body;
+  const data = await prisma.asignatura.create({ data: { nombre, color, profesor: profesor || null } });
   res.status(201).json(data);
 });
 
 router.put('/:id', async (req, res) => {
-  const { nombre, color } = req.body;
-  const data = await prisma.asignatura.update({ where: { id: req.params.id }, data: { nombre, color } });
+  const { nombre, color, profesor } = req.body;
+  const data = await prisma.asignatura.update({ where: { id: req.params.id }, data: { nombre, color, profesor: profesor || null } });
   res.json(data);
 });
 

@@ -20,6 +20,14 @@ router.put('/:id', async (req, res) => {
     where: { id: req.params.id },
     data: { asignatura_id, titulo, fecha, nota, detalles, archivos },
   });
+
+  if (fecha) {
+    await prisma.reminder.updateMany({
+      where: { reference_id: req.params.id, type: 'examen' },
+      data: { due_date: fecha, ...(titulo && { title: titulo }) },
+    });
+  }
+
   res.json(data);
 });
 

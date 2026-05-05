@@ -14,6 +14,8 @@ import Tareas from "./pages/Tareas";
 import Calendario from "./pages/Calendario";
 import CosasQuHacer from "./pages/CosasQuHacer";
 import Login from "./pages/Login";
+import Perfil from "./pages/Perfil";
+import Recordatorios from "./pages/Recordatorios";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +39,8 @@ const App = () => (
           <Route path="/tareas" element={<PrivateRoute><Tareas /></PrivateRoute>} />
           <Route path="/calendario" element={<PrivateRoute><Calendario /></PrivateRoute>} />
           <Route path="/cosas-que-hacer" element={<PrivateRoute><CosasQuHacer /></PrivateRoute>} />
+          <Route path="/perfil" element={<PrivateRoute><Perfil /></PrivateRoute>} />
+          <Route path="/recordatorios" element={<PrivateRoute><Recordatorios /></PrivateRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

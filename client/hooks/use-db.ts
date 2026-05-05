@@ -2,13 +2,23 @@ export interface Asignatura {
   id: string;
   nombre: string;
   color: string;
+  profesor?: string;
 }
 
 export interface Tarea {
   id: string;
   asignatura_id: string;
   titulo: string;
+  descripcion?: string;
   fecha: string;
+  hecha: boolean;
+  archivos?: any;
+}
+
+export interface SubTarea {
+  id: string;
+  tarea_id: string;
+  titulo: string;
   hecha: boolean;
 }
 
@@ -46,7 +56,10 @@ const api = async (path: string, options?: RequestInit) => {
     throw new Error('No autorizado');
   }
   if (res.status === 204) return null;
-  if (!res.ok) throw new Error(`API error ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Error ${res.status}`);
+  }
   return res.json();
 };
 
